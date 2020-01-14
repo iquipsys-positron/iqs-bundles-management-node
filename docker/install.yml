@@ -1,0 +1,71 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: iqs-positron
+  name: iqs-bundles-management-node-deploy
+spec:
+  replicas: 1
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: iqs-bundles-management-node
+    spec: 
+      containers:
+      - name: iqs-bundles-management-node-pod
+        image: registry.gitlab.com/iqs-bundles/iqs-bundles-management-node:1.0.0-1-rc
+        ports:
+        - containerPort: 8080
+          name: management
+        env:
+        - name: ENV_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: iqs-positron-config
+              key: env_name
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: iqs-positron-secret
+              key: aws_region
+        - name: AWS_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              name: iqs-positron-secret
+              key: aws_access_id
+        - name: AWS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: iqs-positron-secret
+              key: aws_access_key
+        livenessProbe:
+          httpGet:
+            path: /heartbeat
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 40
+          timeoutSeconds: 6
+      imagePullSecrets:
+      - name: gitlab-docker-registry
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: iqs-positron
+  name: iqs-bundles-management
+  labels: 
+    app: iqs-bundles-management-node
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    nodePort: 30016
+    protocol: TCP
+    name: management
+  selector:
+    app: iqs-bundles-management-node
